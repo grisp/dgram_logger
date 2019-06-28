@@ -30,25 +30,44 @@ log(Log_event, #{config := C}) ->
 
 %% logger helper functions
 
-send(Sock, Host, Port, #{level := Level, msg := Msg}) ->            
+send(Sock, Host, Port, #{level := Level, msg := Msg, meta := Meta}) ->
+    Tags = meta_tags(Meta),
+    erlang:display(iolist_to_binary(Tags)),
     Data = case Msg of
                {string, String} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~p msg=\"~s\"\n", 
-                                   [Level, String]));
+                     io_lib:format("sol,level=~p~s msg=\"~s\"\n", 
+                                   [Level, Tags, String]));
                {report, Report} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~p msg=\"~s\"\n", 
-                                   [Level, "report"]));
+                     io_lib:format("sol,level=~p~s msg=\"~s\"\n", 
+                                   [Level, Tags, "report"]));
                {Format, Args} when is_list(Args) ->
                    Io_list = io_lib:format(Format, Args),
                    iolist_to_binary(
-                     io_lib:format("sol,level=~p msg=\"~s\"\n", 
-                                   [Level, Io_list]))
+                     io_lib:format("sol,level=~p~s msg=\"~s\"\n", 
+                                   [Level, Tags, Io_list]))
            end,
     gen_udp:send(Sock, Host, Port, Data).
 
-%% gen_server callbacks
+meta_tags(Meta) ->
+    prepend_comma(lists:join($,, maps:fold(fun format_tag/3, [], Meta))).
+
+prepend_comma([]) ->
+    [];
+prepend_comma(List) ->
+    [$,|List].
+
+format_tag(mfa, _, Acc) ->
+    Acc;
+format_tag(time, _, Acc) ->
+    Acc;
+format_tag(report_cb, _, Acc) ->
+    Acc;
+format_tag(Key, Value, Acc) ->
+    [io_lib:format("~p=~p", [Key, Value]) | Acc].
+
+%% Meta_server callbacks
 
 start() ->
     gen_server:start({local, ?MODULE}, ?MODULE, [], []).
