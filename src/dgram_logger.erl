@@ -31,24 +31,28 @@ log(Log_event, #{config := C}) ->
 %% logger helper functions
 
 send(Sock, Host, Port, #{level := Level, msg := Msg, meta := Meta}) ->
+    %% erlang:display({meta, Meta}),
+    %% erlang:display({msg, Msg}),
     Tags = meta_tags(Meta),
     Data = case Msg of
                {string, String} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~p~s msg=\"~s\"\n", 
+                     io_lib:format("sol,level=~w~s msg=\"~s\"\n", 
                                    [Level, Tags, String]));
-               {report, #{report := Report}} ->
+               %% special treatmeant of SASL logs
+               {report, #{label := Label, report := Report}} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~p~s ~s\n", 
-                                   [Level, Tags, report_values(Report)]));
+                     io_lib:format("sol,level=~w~s ~s\n", 
+                                   [Level, Tags, 
+                                    report_values([Label|Report])]));
                {report, Report} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~p~s ~s\n", 
+                     io_lib:format("sol,level=~w~s ~s\n", 
                                    [Level, Tags, report_values(Report)]));
                {Format, Args} when is_list(Args) ->
                    Io_list = io_lib:format(Format, Args),
                    iolist_to_binary(
-                     io_lib:format("sol,level=~p~s msg=\"~s\"\n", 
+                     io_lib:format("sol,level=~w~s msg=\"~s\"\n", 
                                    [Level, Tags, Io_list]))
            end,
     gen_udp:send(Sock, Host, Port, Data).
@@ -74,15 +78,40 @@ format_tag(report_cb, _, Acc) ->
     Acc;
 format_tag(error_logger, _, Acc) ->
     Acc;
+format_tag(logger_formatter, _, Acc) ->
+    Acc;
+format_tag(domain, Dlist, Acc) ->
+    ["domain=" ++ 
+         lists:join($/, lists:map(fun erlang:atom_to_list/1, Dlist)) |Acc];
 format_tag(Key, Value, Acc) ->
-    [io_lib:format("~p=~p", [Key, Value]) | Acc].
+    case io_lib:deep_char_list(Value) of
+        true -> [io_lib:format("~w=~s", [Key, Value]) | Acc];
+        false -> [io_lib:format("~w=~w", [Key, Value]) | Acc]
+    end.
 
 format_entry({Key, Value}, Acc) ->
     format_entry(Key, Value, Acc).
 
+format_entry(Key, Value, Acc) when is_integer(Value) ->
+    [io_lib:format("~w=~wi", [Key, Value]) | Acc];
+format_entry(Key, Value, Acc) when is_boolean(Value); is_float(Value) ->
+    [io_lib:format("~w=~w", [Key, Value]) | Acc];
 format_entry(Key, Value, Acc) ->
-    [io_lib:format("~p=~p", [Key, Value]) | Acc].
+    V = case io_lib:deep_char_list(Value) of
+            true -> io_lib:format("~s", [Value]);
+            false -> io_lib:format("~w", [Value])
+        end,
+    [io_lib:format("~w=\"~s\"", [Key, escape_chars(V, $\", $\\ )])  | Acc].
 
+escape_chars([], _Q, _Esc) ->            
+    [];
+escape_chars([Q|Chars], Q, Esc) ->            
+    [Esc,Q|escape_chars(Chars, Q, Esc)];
+escape_chars([C|Chars], Q, Esc) when is_integer(C) -> 
+    [C|escape_chars(Chars, Q, Esc)];
+escape_chars([L|Chars], Q, Esc) when is_list(L) -> 
+    [escape_chars(L, Q, Esc)|escape_chars(Chars, Q, Esc)].
+    
 %% Meta_server callbacks
 
 start() ->
