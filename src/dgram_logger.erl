@@ -90,7 +90,9 @@ format_tag(Key, Value, Acc) ->
     end.
 
 format_entry({Key, Value}, Acc) ->
-    format_entry(Key, Value, Acc).
+    format_entry(Key, Value, Acc);
+format_entry(Any, Acc) ->
+    format_entry(dummy, Any, Acc).
 
 format_entry(Key, Value, Acc) when is_integer(Value) ->
     [io_lib:format("~w=~wi", [Key, Value]) | Acc];
