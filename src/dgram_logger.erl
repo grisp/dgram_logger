@@ -1,23 +1,18 @@
 -module(dgram_logger).
 
--behaviour(gen_server).
-
-%% API
--export([start/0, start_link/0]).
-
-%% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3, format_status/2]).
-
 %% logger callbacks
--export([adding_handler/1, log/2]).
-
--record(state, {sock}).
+-export([adding_handler/1]).
+-export([log/2]).
+-export([removing_handler/1]).
 
 %% logger callbacks
 
 adding_handler(#{config := C} = Config) ->
-    {ok, Config#{config => C#{sock => get_socket()}}}.
+    Pid = dgram_logger_sup:add_handler_proc(),
+    {ok, Config#{config => C#{
+        sock => dgram_logger_proc:get_socket(Pid),
+        pid => Pid
+    }}}.
 
 log(Log_event, #{config := C}) ->
     case C of
@@ -26,6 +21,9 @@ log(Log_event, #{config := C}) ->
           port := Port} ->
             send(Sock, Host, Port, Log_event)
     end.
+
+removing_handler(#{config := #{pid := Pid}}) ->
+    dgram_logger_sup:remove_handler_proc(Pid).
 
 %% logger helper functions
 
@@ -116,38 +114,3 @@ escape_chars([C|Chars], Q, Esc) when is_integer(C) ->
     [C|escape_chars(Chars, Q, Esc)];
 escape_chars([L|Chars], Q, Esc) when is_list(L) ->
     [escape_chars(L, Q, Esc)|escape_chars(Chars, Q, Esc)].
-
-%% Meta_server callbacks
-
-start() ->
-    gen_server:start({local, ?MODULE}, ?MODULE, [], []).
-
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-get_socket() ->
-    gen_server:call(?MODULE, get_socket).
-
-init([]) ->
-    {ok, Sock} = gen_udp:open(0),
-    {ok, #state{sock=Sock}}.
-
-handle_call(get_socket, _From, State) ->
-    {reply, State#state.sock, State};
-handle_call(Call, _From, _State) ->
-    error({unknown_call, Call}).
-
-handle_cast(Cast, _State) ->
-    error({unknown_cast, Cast}).
-
-handle_info(Info, _State) ->
-    error({unknown_info, Info}).
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-format_status(_Opt, Status) ->
-    Status.
