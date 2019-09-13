@@ -16,9 +16,8 @@
 
 %% logger callbacks
 
-adding_handler(#{config := _C}=Config) ->
-    % add checks for internal config
-    {ok, Config}.
+adding_handler(#{config := C} = Config) ->
+    {ok, Config#{config => C#{sock => get_socket()}}}.
 
 log(Log_event, #{config := C}) ->
     case C of
@@ -126,15 +125,15 @@ start() ->
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+get_socket() ->
+    gen_server:call(?MODULE, get_socket).
 
 init([]) ->
     {ok, Sock} = gen_udp:open(0),
-    ok = logger:add_handler(dgram_logger, dgram_logger,
-                            #{config => #{sock => Sock,
-                                          host => {127,0,0,1},
-                                          port => 8089}}),
     {ok, #state{sock=Sock}}.
 
+handle_call(get_socket, _From, State) ->
+    {reply, State#state.sock, State};
 handle_call(Call, _From, _State) ->
     error({unknown_call, Call}).
 
