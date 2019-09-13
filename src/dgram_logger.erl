@@ -70,8 +70,12 @@ prepend_comma([]) ->
 prepend_comma(List) ->
     [$,|List].
 
-format_tag(mfa, _, Acc) ->
-    Acc;
+format_tag(mfa, {Module, Function, Arity}, Acc) ->
+    [[
+        ["module=", atom_to_list(Module), ","],
+        ["function=", atom_to_list(Function), ","],
+        ["arity=", io_lib:format("~b", [Arity])]
+    ]|Acc];
 format_tag(time, _, Acc) ->
     Acc;
 format_tag(report_cb, _, Acc) ->
