@@ -135,15 +135,14 @@ init([]) ->
                                           port => 8089}}),
     {ok, #state{sock=Sock}}.
 
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+handle_call(Call, _From, _State) ->
+    error({unknown_call, Call}).
 
-handle_cast(_Request, State) ->
-    {noreply, State}.
+handle_cast(Cast, _State) ->
+    error({unknown_cast, Cast}).
 
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info(Info, _State) ->
+    error({unknown_info, Info}).
 
 terminate(_Reason, _State) ->
     ok.
