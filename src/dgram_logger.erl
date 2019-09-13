@@ -54,7 +54,7 @@ send(Sock, Host, Port, #{level := Level, msg := Msg, meta := Meta}) ->
                      io_lib:format("sol,level=~w~s msg=\"~s\"\n",
                                    [Level, Tags, Io_list]))
            end,
-    gen_udp:send(Sock, Host, Port, Data).
+    ok = gen_udp:send(Sock, Host, Port, Data).
 
 meta_tags(Meta) ->
     prepend_comma(lists:join($,, maps:fold(fun format_tag/3, [], Meta))).
