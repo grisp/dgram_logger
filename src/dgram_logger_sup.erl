@@ -28,7 +28,7 @@ start_link() ->
 init([]) ->
     {ok, {#{strategy => one_for_all,
                    intensity => 10,
-                   period => 60}, 
+                   period => 60},
                   [
                    #{id => dgram_logger,
                      start => {dgram_logger, start_link, []}}

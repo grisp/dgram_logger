@@ -16,7 +16,7 @@
 
 %% logger callbacks
 
-adding_handler(#{config := _C}=Config) -> 
+adding_handler(#{config := _C}=Config) ->
     % add checks for internal config
     {ok, Config}.
 
@@ -37,22 +37,22 @@ send(Sock, Host, Port, #{level := Level, msg := Msg, meta := Meta}) ->
     Data = case Msg of
                {string, String} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~w~s msg=\"~s\"\n", 
+                     io_lib:format("sol,level=~w~s msg=\"~s\"\n",
                                    [Level, Tags, String]));
                %% special treatmeant of SASL logs
                {report, #{label := Label, report := Report}} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~w~s ~s\n", 
-                                   [Level, Tags, 
+                     io_lib:format("sol,level=~w~s ~s\n",
+                                   [Level, Tags,
                                     report_values([Label|Report])]));
                {report, Report} ->
                    iolist_to_binary(
-                     io_lib:format("sol,level=~w~s ~s\n", 
+                     io_lib:format("sol,level=~w~s ~s\n",
                                    [Level, Tags, report_values(Report)]));
                {Format, Args} when is_list(Args) ->
                    Io_list = io_lib:format(Format, Args),
                    iolist_to_binary(
-                     io_lib:format("sol,level=~w~s msg=\"~s\"\n", 
+                     io_lib:format("sol,level=~w~s msg=\"~s\"\n",
                                    [Level, Tags, Io_list]))
            end,
     gen_udp:send(Sock, Host, Port, Data).
@@ -64,7 +64,7 @@ report_values(Report) when is_list(Report) ->
     lists:join($,, lists:foldl(fun format_entry/2, [], Report));
 report_values(Report) when is_map(Report) ->
     lists:join($,, maps:fold(fun format_entry/3, [], Report)).
-    
+
 prepend_comma([]) ->
     [];
 prepend_comma(List) ->
@@ -81,7 +81,7 @@ format_tag(error_logger, _, Acc) ->
 format_tag(logger_formatter, _, Acc) ->
     Acc;
 format_tag(domain, Dlist, Acc) ->
-    ["domain=" ++ 
+    ["domain=" ++
          lists:join($/, lists:map(fun erlang:atom_to_list/1, Dlist)) |Acc];
 format_tag(Key, Value, Acc) ->
     case io_lib:deep_char_list(Value) of
@@ -105,15 +105,15 @@ format_entry(Key, Value, Acc) ->
         end,
     [io_lib:format("~w=\"~s\"", [Key, escape_chars(V, $\", $\\ )])  | Acc].
 
-escape_chars([], _Q, _Esc) ->            
+escape_chars([], _Q, _Esc) ->
     [];
-escape_chars([Q|Chars], Q, Esc) ->            
+escape_chars([Q|Chars], Q, Esc) ->
     [Esc,Q|escape_chars(Chars, Q, Esc)];
-escape_chars([C|Chars], Q, Esc) when is_integer(C) -> 
+escape_chars([C|Chars], Q, Esc) when is_integer(C) ->
     [C|escape_chars(Chars, Q, Esc)];
-escape_chars([L|Chars], Q, Esc) when is_list(L) -> 
+escape_chars([L|Chars], Q, Esc) when is_list(L) ->
     [escape_chars(L, Q, Esc)|escape_chars(Chars, Q, Esc)].
-    
+
 %% Meta_server callbacks
 
 start() ->
@@ -125,9 +125,9 @@ start_link() ->
 
 init([]) ->
     {ok, Sock} = gen_udp:open(0),
-    ok = logger:add_handler(dgram_logger, dgram_logger, 
+    ok = logger:add_handler(dgram_logger, dgram_logger,
                             #{config => #{sock => Sock,
-                                          host => {127,0,0,1}, 
+                                          host => {127,0,0,1},
                                           port => 8089}}),
     {ok, #state{sock=Sock}}.
 
