@@ -8,24 +8,32 @@
 %% logger callbacks
 
 adding_handler(#{config := C} = Config) ->
-    Pid = dgram_logger_sup:add_handler_proc(),
-    {ok, Config#{config => C#{
-        sock => dgram_logger_proc:get_socket(Pid),
-        pid => Pid
-    }}}.
-
-log(Log_event, #{config := C}) ->
-    case C of
-        #{sock := Sock,
-          host := Host,
-          port := Port} ->
-            send(Sock, Host, Port, Log_event)
+    case verify_config([host, port], C) of
+        ok ->
+            Pid = dgram_logger_sup:add_handler_proc(),
+            {ok, Config#{config => C#{
+                sock => dgram_logger_proc:get_socket(Pid),
+                pid => Pid
+            }}};
+        Error ->
+            Error
     end.
+
+log(Log_event, #{config := #{sock := Sock, host := Host, port := Port}}) ->
+    send(Sock, Host, Port, Log_event).
 
 removing_handler(#{config := #{pid := Pid}}) ->
     dgram_logger_sup:remove_handler_proc(Pid).
 
-%% logger helper functions
+%--- Internal Functions --------------------------------------------------------
+
+verify_config([], _Config) ->
+    ok;
+verify_config([Key|Keys], Config) ->
+    case maps:is_key(Key, Config) of
+        true  -> verify_config(Keys, Config);
+        false -> {error, {missing_configuration, Key}}
+    end.
 
 send(Sock, Host, Port, #{level := Level, msg := Msg, meta := Meta}) ->
     %% erlang:display({meta, Meta}),

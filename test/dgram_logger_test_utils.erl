@@ -16,12 +16,12 @@
 start(ID) -> start(ID, #{}).
 
 start(ID, Config) ->
-    ok = logger:add_handler(ID, dgram_logger, #{
+    logger:add_handler(ID, dgram_logger, #{
         config => maps:merge(?DEFAULT_CONFIG, Config)
     }).
 
 stop(ID) ->
-    ok = logger:remove_handler(ID).
+    logger:remove_handler(ID).
 
 notice(String) -> ?LOG_NOTICE(String).
 
