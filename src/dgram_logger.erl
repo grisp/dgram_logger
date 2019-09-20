@@ -8,12 +8,13 @@
 %% logger callbacks
 
 adding_handler(#{config := C} = Config) ->
-    case verify_config([host, port], C) of
+    case verify_config([host, port, measurement], C) of
         ok ->
             Pid = dgram_logger_sup:add_handler_proc(),
             {ok, Config#{config => C#{
                 sock => dgram_logger_proc:get_socket(Pid),
-                pid => Pid
+                pid => Pid,
+                measurement => to_binary(maps:get(measurement, C))
             }}};
         Error ->
             Error
@@ -24,8 +25,12 @@ log(#{level := Level, msg := Msg, meta := Meta}, #{config := Config}) ->
     %% erlang:display({msg, Msg}),
     Tags = format_tags(Meta),
     Fields = format_fields(Msg),
-    Data = ["sol,", io_lib:format("level=~w", [Level]), Tags, $\s, Fields, $\n],
-    send(Config, Data).
+    send(Config, [
+        maps:get(measurement, Config), $,,
+        io_lib:format("level=~w", [Level]), Tags, $\s,
+        Fields,
+        $\n
+    ]).
 
 removing_handler(#{config := #{pid := Pid}}) ->
     dgram_logger_sup:remove_handler_proc(Pid).
@@ -39,6 +44,9 @@ verify_config([Key|Keys], Config) ->
         true  -> verify_config(Keys, Config);
         false -> {error, {missing_configuration, Key}}
     end.
+
+to_binary(Term) when is_binary(Term) -> Term;
+to_binary(Term) when is_atom(Term)   -> atom_to_binary(Term, utf8).
 
 format_tags(Meta) ->
     prepend_comma(lists:join($,, maps:fold(fun format_tag/3, [], Meta))).
