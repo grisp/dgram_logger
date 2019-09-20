@@ -19,8 +19,13 @@ adding_handler(#{config := C} = Config) ->
             Error
     end.
 
-log(Log_event, #{config := #{sock := Sock, host := Host, port := Port}}) ->
-    send(Sock, Host, Port, Log_event).
+log(#{level := Level, msg := Msg, meta := Meta}, #{config := Config}) ->
+    %% erlang:display({meta, Meta}),
+    %% erlang:display({msg, Msg}),
+    Tags = format_tags(Meta),
+    Fields = format_fields(Msg),
+    Data = ["sol,", io_lib:format("level=~w", [Level]), Tags, $\s, Fields, $\n],
+    send(Config, Data).
 
 removing_handler(#{config := #{pid := Pid}}) ->
     dgram_logger_sup:remove_handler_proc(Pid).
@@ -35,35 +40,18 @@ verify_config([Key|Keys], Config) ->
         false -> {error, {missing_configuration, Key}}
     end.
 
-send(Sock, Host, Port, #{level := Level, msg := Msg, meta := Meta}) ->
-    %% erlang:display({meta, Meta}),
-    %% erlang:display({msg, Msg}),
-    Tags = meta_tags(Meta),
-    Data = case Msg of
-               {string, String} ->
-                   iolist_to_binary(
-                     io_lib:format("sol,level=~w~s msg=\"~s\"\n",
-                                   [Level, Tags, String]));
-               %% special treatmeant of SASL logs
-               {report, #{label := Label, report := Report}} ->
-                   iolist_to_binary(
-                     io_lib:format("sol,level=~w~s ~s\n",
-                                   [Level, Tags,
-                                    report_values([Label|Report])]));
-               {report, Report} ->
-                   iolist_to_binary(
-                     io_lib:format("sol,level=~w~s ~s\n",
-                                   [Level, Tags, report_values(Report)]));
-               {Format, Args} when is_list(Args) ->
-                   Io_list = io_lib:format(Format, Args),
-                   iolist_to_binary(
-                     io_lib:format("sol,level=~w~s msg=\"~s\"\n",
-                                   [Level, Tags, Io_list]))
-           end,
-    ok = gen_udp:send(Sock, Host, Port, Data).
-
-meta_tags(Meta) ->
+format_tags(Meta) ->
     prepend_comma(lists:join($,, maps:fold(fun format_tag/3, [], Meta))).
+
+format_fields({string, String}) ->
+    ["msg=\"", String, "\""];
+format_fields({report, #{label := Label, report := Report}}) ->
+    %% special treatmeant of SASL logs
+    report_values([Label|Report]);
+format_fields({report, Report}) ->
+    report_values(Report);
+format_fields({Format, Args}) when is_list(Args) ->
+    ["msg=\"", io_lib:format(Format, Args), "\""].
 
 report_values(Report) when is_list(Report) ->
     lists:join($,, lists:foldl(fun format_entry/2, [], Report));
@@ -122,3 +110,6 @@ escape_chars([C|Chars], Q, Esc) when is_integer(C) ->
     [C|escape_chars(Chars, Q, Esc)];
 escape_chars([L|Chars], Q, Esc) when is_list(L) ->
     [escape_chars(L, Q, Esc)|escape_chars(Chars, Q, Esc)].
+
+send(#{sock := Sock, host := Host, port := Port}, Data) ->
+    ok = gen_udp:send(Sock, Host, Port, Data).
