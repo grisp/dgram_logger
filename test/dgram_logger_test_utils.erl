@@ -8,6 +8,7 @@
 -export([stop/1]).
 -export([notice/1]).
 -export([temp/1]).
+-export([temp/2]).
 
 -define(DEFAULT_CONFIG, #{host => {127,0,0,1}, port => 8089}).
 
@@ -26,3 +27,5 @@ stop(ID) ->
 notice(String) -> ?LOG_NOTICE(String).
 
 temp(Value) -> ?LOG_NOTICE(#{temperature => Value}).
+
+temp(Value, Meta) -> ?LOG_NOTICE(#{temperature => Value}, Meta).

@@ -5,16 +5,19 @@
 -export([log/2]).
 -export([removing_handler/1]).
 
+-define(DEFAULT_CONFIG, #{send_timestamp => true}).
+
 %% logger callbacks
 
-adding_handler(#{config := C} = Config) ->
-    case verify_config([host, port, measurement], C) of
+adding_handler(#{config := RawConfig} = LoggerConfig) ->
+    DgramConfig = maps:merge(?DEFAULT_CONFIG, RawConfig),
+    case verify_config([host, port, measurement], DgramConfig) of
         ok ->
             Pid = dgram_logger_sup:add_handler_proc(),
-            {ok, Config#{config => C#{
+            {ok, LoggerConfig#{config => DgramConfig#{
                 sock => dgram_logger_proc:get_socket(Pid),
                 pid => Pid,
-                measurement => to_binary(maps:get(measurement, C))
+                measurement => to_binary(maps:get(measurement, DgramConfig))
             }}};
         Error ->
             Error
@@ -29,6 +32,7 @@ log(#{level := Level, msg := Msg, meta := Meta}, #{config := Config}) ->
         maps:get(measurement, Config), $,,
         io_lib:format("level=~w", [Level]), Tags, $\s,
         Fields,
+        format_timestamp(Config, Meta),
         $\n
     ]).
 
@@ -60,6 +64,13 @@ format_fields({report, Report}) ->
     report_values(Report);
 format_fields({Format, Args}) when is_list(Args) ->
     ["msg=\"", io_lib:format(Format, Args), "\""].
+
+format_timestamp(#{send_timestamp := true}, #{time := Time}) ->
+    io_lib:format(" ~b", [
+        erlang:convert_time_unit(Time, microsecond, nanosecond)
+    ]);
+format_timestamp(_Config, _Meta) ->
+    [].
 
 report_values(Report) when is_list(Report) ->
     lists:join($,, lists:foldl(fun format_entry/2, [], Report));
