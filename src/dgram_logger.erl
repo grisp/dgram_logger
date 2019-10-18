@@ -11,11 +11,13 @@
 
 adding_handler(#{config := RawConfig} = LoggerConfig) ->
     DgramConfig = maps:merge(?DEFAULT_CONFIG, RawConfig),
+    Parent = self(),
     case verify_config([host, port, measurement], DgramConfig) of
         ok ->
-            Pid = dgram_logger_sup:add_handler_proc(),
+            Pid = spawn(fun() -> Parent ! gen_udp:open(0), 
+                                 receive stop -> ok end end),
             {ok, LoggerConfig#{config => DgramConfig#{
-                sock => dgram_logger_proc:get_socket(Pid),
+                sock => receive {ok, Socket} -> Socket end,
                 pid => Pid,
                 measurement => to_binary(maps:get(measurement, DgramConfig))
             }}};
@@ -37,7 +39,7 @@ log(#{level := Level, msg := Msg, meta := Meta}, #{config := Config}) ->
     ]).
 
 removing_handler(#{config := #{pid := Pid}}) ->
-    dgram_logger_sup:remove_handler_proc(Pid).
+    Pid ! stop.
 
 %--- Internal Functions --------------------------------------------------------
 
